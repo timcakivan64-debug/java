@@ -1,166 +1,77 @@
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
-import java.util.Scanner;
+import java.util.Arrays;
+import java.util.Locale;
 
-public class Main {
-    // Кодування консолі: на Windows програма сама перемикає її на UTF-8,
-    // щоб кирилиця (і, ї, є) виводилась і читалась правильно
-    static {
-        try {
-            if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
-                new ProcessBuilder("cmd", "/c", "chcp 65001 >nul")
-                        .inheritIO().start().waitFor();
-            }
-        } catch (Exception ignored) {
-            // якщо не вийшло — програма все одно працює
-        }
-        System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8));
+/*
+ * ЛР4. Інтерфейси, абстрактні класи, Strategy — продовження домену піцерії.
+ *
+ *  Рівень 1 (базовий):
+ *    - поведінка, що відрізняється: СПОСІБ ОПЛАТИ замовлення;
+ *    - інтерфейс PaymentMethod з двома+ реалізаціями
+ *      (CardPayment, CashPayment, WalletPayment);
+ *    - масив PaymentMethod[] + цикл -> поліморфний виклик pay(...).
+ *
+ *  Рівень 2 (середній):
+ *    - default-метод printPaymentHeader(...) в PaymentMethod
+ *      (успадкований Card/Cash, перевизначений у Wallet);
+ *    - абстрактний клас AbstractPaymentMethod з спільною валідацією
+ *      (використовують Card і Cash; Wallet свідомо — ні, "чистий" інтерфейс);
+ *    - PizzaOrder реалізує ОДРАЗУ два інтерфейси: Comparable (сортування)
+ *      і Receiptable (бізнес-поведінка — формування рядка чека).
+ *
+ *  Рівень 3 (високий) — паттерн Strategy:
+ *    - DiscountStrategy — інтерфейс-стратегія з трьома реалізаціями;
+ *    - PizzaOrder (контекст) приймає стратегію через конструктор
+ *      і дозволяє ЗМІНИТИ її під час виконання через setDiscountStrategy(...).
+ */
+void main() {
+    Locale.setDefault(Locale.US);
+
+    IO.println("==============================================");
+    IO.println("   ЛР4. Інтерфейси, абстрактні класи, Strategy");
+    IO.println("==============================================");
+
+    // ---------------- Рівень 1: масив об'єктів інтерфейсу + поліморфізм ----------------
+    IO.println();
+    IO.println("--- Оплата замовлення різними способами (PaymentMethod) ---");
+    PaymentMethod[] payments = {
+            new CardPayment("4521"),
+            new CashPayment(),
+            new WalletPayment(50.0)
+    };
+    double orderTotalForPaymentDemo = 739.38;
+    for (PaymentMethod method : payments) {
+        method.printPaymentHeader("Іван");     // default-метод (у Wallet — перевизначений)
+        method.pay(orderTotalForPaymentDemo);  // у кожного класу — своя реалізація
+        IO.println();
     }
 
-    // ...і для вводу
-    private static final Scanner SC = new Scanner(System.in, StandardCharsets.UTF_8);
+    // ---------------- Рівень 2: клас із двома інтерфейсами одночасно ----------------
+    IO.println("--- Замовлення: Receiptable (бізнес-поведінка) ---");
+    PizzaOrder order1 = new PizzaOrder("Іван", "Пепероні", 231.25, 3, new TieredQuantityDiscount());
+    PizzaOrder order2 = new PizzaOrder("Олена", "Маргарита", 120.00, 1, new NoDiscount());
+    PizzaOrder order3 = new PizzaOrder("Петро", "Чотири сири", 262.50, 6, new TieredQuantityDiscount());
+    PizzaOrder[] orders = { order1, order2, order3 };
 
-    // ---------- допоміжні методи введення ----------
-    private static String readString(String prompt) {
-        System.out.print(prompt);
-        return SC.nextLine().trim();
+    for (PizzaOrder o : orders) {
+        IO.println(o.toReceiptLine());
     }
 
-    private static int readInt(String prompt) {
-        while (true) {
-            try {
-                return Integer.parseInt(readString(prompt));
-            } catch (NumberFormatException e) {
-                System.out.println("Некоректне ціле число, спробуйте ще раз.");
-            }
-        }
+    IO.println();
+    IO.println("--- Ті самі замовлення: Comparable (поведінка сортування) ---");
+    Arrays.sort(orders); // використовує compareTo(...) з PizzaOrder
+    for (PizzaOrder o : orders) {
+        IO.println(o.toReceiptLine());
     }
 
-    private static double readDouble(String prompt) {
-        while (true) {
-            try {
-                return Double.parseDouble(readString(prompt).replace(',', '.'));
-            } catch (NumberFormatException e) {
-                System.out.println("Некоректне число, спробуйте ще раз.");
-            }
-        }
-    }
+    // ---------------- Рівень 3: Strategy — зміна поведінки під час виконання ----------------
+    IO.println();
+    IO.println("--- Strategy: зміна стратегії знижки БЕЗ створення нового об'єкта ---");
+    PizzaOrder promoOrder = new PizzaOrder("Марія", "Гавайська", 218.75, 2, new TieredQuantityDiscount());
+    IO.println("До зміни стратегії:                              " + promoOrder.toReceiptLine());
 
-    private static boolean readBoolean(String prompt) {
-        while (true) {
-            String s = readString(prompt).toLowerCase();
-            if (s.equals("так") || s.equals("т") || s.equals("y")
-                    || s.equals("yes") || s.equals("1")) {
-                return true;
-            }
-            if (s.equals("ні") || s.equals("н") || s.equals("n")
-                    || s.equals("no") || s.equals("0")) {
-                return false;
-            }
-            System.out.println("Введіть так/ні (або y/n, 1/0).");
-        }
-    }
+    promoOrder.setDiscountStrategy(new PromoCodeDiscount(20));
+    IO.println("Після setDiscountStrategy(PromoCodeDiscount 20%): " + promoOrder.toReceiptLine());
 
-    private static Pizza readPizza() {
-        String name = readString("  Назва: ");
-        int diameter = readInt("  Діаметр (см): ");
-        double price = readDouble("  Ціна (грн): ");
-        boolean veg = readBoolean("  Вегетаріанська? (так/ні, y/n): ");
-        return new Pizza(name, diameter, price, veg);
-    }
-
-    // ---------- Рівень 1 ----------
-    private static void printArray(String title, Pizza[] arr) {
-        System.out.println(title);
-        for (Pizza p : arr) {          // цикл for-each
-            System.out.println("  " + p);
-        }
-    }
-
-    private static int countCheaperThan(Pizza[] arr, double limit) {
-        int count = 0;
-        for (Pizza p : arr) {
-            if (p.getPrice() < limit) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    // ---------- Рівень 2 ----------
-    /** Сортування методом простого обміну (bubble sort) за ціною, за зростанням. */
-    private static void bubbleSortByPrice(Pizza[] arr) {
-        for (int i = 0; i < arr.length - 1; i++) {
-            boolean swapped = false;
-            for (int j = 0; j < arr.length - 1 - i; j++) {
-                if (arr[j].getPrice() > arr[j + 1].getPrice()) {
-                    Pizza tmp = arr[j];
-                    arr[j] = arr[j + 1];
-                    arr[j + 1] = tmp;
-                    swapped = true;
-                }
-            }
-            if (!swapped) {   // масив уже відсортований
-                break;
-            }
-        }
-    }
-
-    private static Pizza[] copyArray(Pizza[] src) {
-        Pizza[] copy = new Pizza[src.length];
-        for (int i = 0; i < src.length; i++) {
-            copy[i] = src[i];
-        }
-        return copy;
-    }
-
-    // ---------- Рівень 3 ----------
-    /** Лінійний пошук за цілим об'єктом. Повертає індекс або -1, якщо не знайдено. */
-    private static int linearSearch(Pizza[] arr, Pizza sample) {
-        for (int i = 0; i < arr.length; i++) {
-            if (arr[i].equals(sample)) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    public static void main(String[] args) {
-        // ----- Рівень 1: заповнення масиву з клавіатури -----
-        int n = 0;
-        while (n <= 0) {
-            n = readInt("Скільки піц у меню? ");
-        }
-
-        Pizza[] menu = new Pizza[n];
-        for (int i = 0; i < menu.length; i++) {
-            System.out.println("Піца #" + (i + 1) + ":");
-            menu[i] = readPizza();
-        }
-
-        System.out.println();
-        printArray("=== Меню піцерії ===", menu);
-
-        double limit = readDouble("\nПорахувати піци дешевші за (грн): ");
-        System.out.println("Кількість піц дешевших за " + limit + " грн: "
-                + countCheaperThan(menu, limit));
-
-        // ----- Рівень 2: сортування -----
-        Pizza[] sorted = copyArray(menu);
-        bubbleSortByPrice(sorted);
-
-        System.out.println();
-        printArray("=== До сортування ===", menu);
-        printArray("=== Після сортування за ціною (зростання) ===", sorted);
-
-        // ----- Рівень 3: пошук за об'єктом -----
-        System.out.println("\nВведіть піцу-зразок для пошуку:");
-        Pizza sample = readPizza();
-        int index = linearSearch(menu, sample);
-        if (index >= 0) {
-            System.out.println("Знайдено на позиції " + (index + 1) + ": " + menu[index]);
-        } else {
-            System.out.println("Такої піци в меню немає.");
-        }
-    }
+    promoOrder.setDiscountStrategy(new NoDiscount());
+    IO.println("Після setDiscountStrategy(NoDiscount):            " + promoOrder.toReceiptLine());
 }
