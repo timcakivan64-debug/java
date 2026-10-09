@@ -3,6 +3,9 @@ public class PromoCodeDiscount implements DiscountStrategy {
     private final double percent;
 
     public PromoCodeDiscount(double percent) {
+        if (percent < 0 || percent > 100) {
+            throw new IllegalArgumentException("Відсоток знижки має бути в межах 0..100: " + percent);
+        }
         this.percent = percent;
     }
 
@@ -13,6 +16,6 @@ public class PromoCodeDiscount implements DiscountStrategy {
 
     @Override
     public String getDescription() {
-        return "промокод на " + percent + "% знижки";
+        return String.format("промокод на %.0f%% знижки", percent);
     }
 }

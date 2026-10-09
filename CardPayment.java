@@ -2,6 +2,9 @@ public class CardPayment extends AbstractPaymentMethod {
     private final String cardLastDigits;
 
     public CardPayment(String cardLastDigits) {
+        if (cardLastDigits == null || !cardLastDigits.matches("\\d{4}")) {
+            throw new IllegalArgumentException("Потрібно рівно 4 останні цифри картки: " + cardLastDigits);
+        }
         this.cardLastDigits = cardLastDigits;
     }
 
@@ -16,5 +19,5 @@ public class CardPayment extends AbstractPaymentMethod {
     public String getLabel() {
         return "банківська картка";
     }
-    // printPaymentHeader(...) не перевизначається — використовується default з інтерфейсу
+    // printPaymentHeader(...) не перевизначається — береться default з інтерфейсу
 }

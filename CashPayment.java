@@ -3,7 +3,7 @@ public class CashPayment extends AbstractPaymentMethod {
     @Override
     public double pay(double amount) {
         double valid = validateAmount(amount);
-        System.out.printf("Отримано готівкою %.2f грн. Решта видана, чек роздруковано.%n", valid);
+        System.out.printf("Отримано готівкою %.2f грн. Чек роздруковано.%n", valid);
         return valid;
     }
 
@@ -11,5 +11,5 @@ public class CashPayment extends AbstractPaymentMethod {
     public String getLabel() {
         return "готівка";
     }
-    // printPaymentHeader(...) не перевизначається — використовується default з інтерфейсу
+    // printPaymentHeader(...) не перевизначається — береться default з інтерфейсу
 }

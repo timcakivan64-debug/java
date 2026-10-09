@@ -1,49 +1,61 @@
-# ЛР4. Інтерфейси, абстрактні класи, Strategy
+# ЛР3 + ЛР4. Винятки, інтерфейси, абстрактні класи, Strategy
 
-Консольний застосунок мовою Java — продовження предметної області
-«Електронне меню піцерії» (ЛР №1–3). Реалізовано поліморфну поведінку
-через інтерфейси, абстрактний клас зі спільною логікою та паттерн Strategy.
+Консольний застосунок мовою Java — предметна область **«Електронне меню піцерії»**.
+Дві лабораторні виконано як один проєкт навколо спільної сутності.
+
+**Сутність:** `PizzaOrder` — замовлення піци (клієнт, піца, ціна, діаметр, кількість, чайові).
+- ЛР3: доменні правила замовлення порушуються через власні винятки.
+- ЛР4: способи оплати (`PaymentMethod`) і розрахунок знижки (`DiscountStrategy`) — варіативна поведінка.
 
 ## Файли
 
 | Файл | Призначення |
 | --- | --- |
-| `Main.java` | демонстрація всіх трьох рівнів |
-| `PaymentMethod.java` | інтерфейс способу оплати (+ default-метод) |
+| `Main.java` | точка входу: запускає демонстрацію ЛР3, потім ЛР4 |
+| `ExceptionsDemo.java` | **ЛР3**, рівні 1–3 |
+| `PizzeriaException.java` | базовий unchecked-виняток (RuntimeException) |
+| `InvalidDiameterException.java`, `InvalidTipException.java` | підкласи `PizzeriaException` |
+| `InvalidQuantityException.java` | checked-виняток (extends Exception) з полем `invalidQuantity` |
+| `PizzaOrder.java` | сутність; валідація (ЛР3); контекст Strategy, `Comparable` + `Receiptable` (ЛР4) |
+| `PaymentMethod.java` | інтерфейс оплати + default-метод |
 | `AbstractPaymentMethod.java` | абстрактний клас зі спільною валідацією суми |
 | `CardPayment.java`, `CashPayment.java` | реалізації через абстрактний клас |
 | `WalletPayment.java` | «чиста» реалізація інтерфейсу, перевизначає default-метод |
-| `DiscountStrategy.java` | інтерфейс-стратегія розрахунку знижки |
-| `TieredQuantityDiscount.java` | стратегія: знижка за кількістю (як у ЛР №1) |
-| `NoDiscount.java` | стратегія: без знижки |
-| `PromoCodeDiscount.java` | стратегія: фіксований % за промокодом |
+| `DiscountStrategy.java` | інтерфейс-стратегія знижки |
+| `TieredQuantityDiscount.java`, `NoDiscount.java`, `PromoCodeDiscount.java` | три стратегії |
 | `Receiptable.java` | інтерфейс бізнес-поведінки (рядок чека) |
-| `PizzaOrder.java` | контекст Strategy; реалізує `Comparable` + `Receiptable` одночасно |
 
-## Що саме реалізовано
+## ЛР3. Що реалізовано
 
-### Рівень 1. Базовий
-- Поведінка, що відрізняється: **спосіб оплати замовлення**.
-- Інтерфейс `PaymentMethod` і три реалізації: `CardPayment`, `CashPayment`, `WalletPayment`.
-- Масив `PaymentMethod[]` + цикл `for` → поліморфний виклик `pay(...)`: кожен клас списує гроші по-своєму.
+**Рівень 1.** Три ситуації з конкретними `catch` і зрозумілими повідомленнями:
+`ArithmeticException` (середнє по порожньому списку), `ArrayIndexOutOfBoundsException` (позиція меню),
+`InputMismatchException` (текст замість числа в `Scanner`). Блок `finally` закриває `Scanner`.
 
-### Рівень 2. Середній
-- **Default-метод** `printPaymentHeader(...)` в `PaymentMethod` — `CardPayment`/`CashPayment` використовують його без змін, `WalletPayment` перевизначає (додає інформацію про бонуси).
-- **Абстрактний клас** `AbstractPaymentMethod` виносить спільну перевірку суми для `CardPayment`/`CashPayment`; `WalletPayment` свідомо реалізує інтерфейс напряму — показано обидва підходи й коментарем пояснено, чому саме так.
-- **Клас із двома інтерфейсами одночасно**: `PizzaOrder implements Comparable<PizzaOrder>, Receiptable` — окремо поведінка сортування (`compareTo`) і окремо бізнес-поведінка (`toReceiptLine`).
+**Рівень 2.** Checked-виняток `InvalidQuantityException` (`super(message)` + поле `invalidQuantity`),
+кидається в конструкторі `PizzaOrder` (кількість поза 1..50) і ловиться окремим `catch`.
 
-### Рівень 3. Високий — паттерн Strategy
-- `DiscountStrategy` — інтерфейс-стратегія з трьома реалізаціями.
-- `PizzaOrder` (контекст) приймає стратегію через конструктор і дозволяє **змінити її під час виконання** методом `setDiscountStrategy(...)` — без створення нового об'єкта. У `Main.java` це показано на одному й тому ж об'єкті `promoOrder`: спочатку знижка за кількістю, потім промокод 20%, потім без знижки.
+**Рівень 3.**
+- кілька `catch` в одному `try` у порядку від специфічних до загальних (`tryOrder`);
+- re-throw: `createWithLogging` логує й робить `throw e;`, остаточна обробка — на верхньому рівні;
+- ієрархія: `PizzeriaException` → `InvalidDiameterException`, `InvalidTipException`;
+  один `catch (PizzeriaException e)` ловить обидва підтипи.
 
-## Вимоги
+## ЛР4. Що реалізовано
 
-JDK 25 або новіший (компактний файл-джерело `Main.java` з `void main()`).
+**Рівень 1.** Інтерфейс `PaymentMethod` і три реалізації; масив `PaymentMethod[]` + цикл із поліморфним викликом.
 
-## Компіляція та запуск
+**Рівень 2.** Default-метод `printPaymentHeader` (Card/Cash успадковують, Wallet перевизначає);
+абстрактний клас для Card/Cash, Wallet — «чистий» інтерфейс; `PizzaOrder implements Comparable<PizzaOrder>, Receiptable`.
+
+**Рівень 3 — Strategy.** `PizzaOrder` приймає `DiscountStrategy` через конструктор і дозволяє
+змінити її під час виконання через `setDiscountStrategy(...)` на тому самому об'єкті.
+
+## Запуск
+
+Потрібен JDK 17+.
 
 ```bash
-javac *.java
+javac -encoding UTF-8 *.java
 java Main
 ```
 
@@ -54,22 +66,12 @@ chcp 65001
 java -Dstdout.encoding=UTF-8 Main
 ```
 
-## Приклад виводу (фрагмент Strategy-демонстрації)
-
-```
-До зміни стратегії:                              Марія | Гавайська x2 | знижка за кількістю ... | ДО СПЛАТИ:  437.50 грн
-Після setDiscountStrategy(PromoCodeDiscount 20%): Марія | Гавайська x2 | промокод на 20.0% знижки | ДО СПЛАТИ:  350.00 грн
-Після setDiscountStrategy(NoDiscount):            Марія | Гавайська x2 | без знижки               | ДО СПЛАТИ:  437.50 грн
-```
-
-Той самий об'єкт `promoOrder`, три різні результати — завдяки Strategy.
-
 ## Git-flow
 
 ```bash
-git checkout -b lr4/pizzeria-interfaces
+git checkout -b lr4/pizzeria-exceptions-interfaces
 git add *.java README.md
-git commit -m "LR4: interfaces, abstract class, Strategy pattern for pizzeria"
-git push -u origin lr4/pizzeria-interfaces
-# після цього створити Pull Request у main
+git commit -m "LR3+LR4: exceptions, interfaces, abstract class, Strategy for pizzeria"
+git push -u origin lr4/pizzeria-exceptions-interfaces
+# створити Pull Request у main
 ```

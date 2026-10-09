@@ -1,77 +1,86 @@
 import java.util.Arrays;
 import java.util.Locale;
 
-/*
- * ЛР4. Інтерфейси, абстрактні класи, Strategy — продовження домену піцерії.
+/**
+ * Об'єднана ЛР №3 + ЛР №4 — предметна область «піцерія».
  *
- *  Рівень 1 (базовий):
- *    - поведінка, що відрізняється: СПОСІБ ОПЛАТИ замовлення;
- *    - інтерфейс PaymentMethod з двома+ реалізаціями
- *      (CardPayment, CashPayment, WalletPayment);
- *    - масив PaymentMethod[] + цикл -> поліморфний виклик pay(...).
- *
- *  Рівень 2 (середній):
- *    - default-метод printPaymentHeader(...) в PaymentMethod
- *      (успадкований Card/Cash, перевизначений у Wallet);
- *    - абстрактний клас AbstractPaymentMethod з спільною валідацією
- *      (використовують Card і Cash; Wallet свідомо — ні, "чистий" інтерфейс);
- *    - PizzaOrder реалізує ОДРАЗУ два інтерфейси: Comparable (сортування)
- *      і Receiptable (бізнес-поведінка — формування рядка чека).
- *
- *  Рівень 3 (високий) — паттерн Strategy:
- *    - DiscountStrategy — інтерфейс-стратегія з трьома реалізаціями;
- *    - PizzaOrder (контекст) приймає стратегію через конструктор
- *      і дозволяє ЗМІНИТИ її під час виконання через setDiscountStrategy(...).
+ *  ЛР3: обробка винятків (ExceptionsDemo, PizzeriaException та підкласи,
+ *       InvalidQuantityException).
+ *  ЛР4: інтерфейси, абстрактний клас, default-метод, Strategy
+ *       (PaymentMethod, DiscountStrategy, Receiptable, Comparable).
  */
-void main() {
-    Locale.setDefault(Locale.US);
+public class Main {
 
-    IO.println("==============================================");
-    IO.println("   ЛР4. Інтерфейси, абстрактні класи, Strategy");
-    IO.println("==============================================");
+    public static void main(String[] args) {
+        Locale.setDefault(Locale.US);
 
-    // ---------------- Рівень 1: масив об'єктів інтерфейсу + поліморфізм ----------------
-    IO.println();
-    IO.println("--- Оплата замовлення різними способами (PaymentMethod) ---");
-    PaymentMethod[] payments = {
-            new CardPayment("4521"),
-            new CashPayment(),
-            new WalletPayment(50.0)
-    };
-    double orderTotalForPaymentDemo = 739.38;
-    for (PaymentMethod method : payments) {
-        method.printPaymentHeader("Іван");     // default-метод (у Wallet — перевизначений)
-        method.pay(orderTotalForPaymentDemo);  // у кожного класу — своя реалізація
-        IO.println();
+        System.out.println("==============================================");
+        System.out.println("  ЛР3 + ЛР4. Винятки, інтерфейси, Strategy");
+        System.out.println("==============================================");
+
+        // ---------------- ЛР3 ----------------
+        ExceptionsDemo.run();
+
+        // ---------------- ЛР4 ----------------
+        System.out.println("\n\n==============================================");
+        System.out.println("  ЛР4. Інтерфейси, абстрактні класи, Strategy");
+        System.out.println("==============================================");
+        try {
+            level1and2();
+            level3();
+        } catch (InvalidQuantityException e) {
+            System.out.println("Помилка замовлення: " + e.getMessage()
+                    + " (отримано: " + e.getInvalidQuantity() + ")");
+        }
     }
 
-    // ---------------- Рівень 2: клас із двома інтерфейсами одночасно ----------------
-    IO.println("--- Замовлення: Receiptable (бізнес-поведінка) ---");
-    PizzaOrder order1 = new PizzaOrder("Іван", "Пепероні", 231.25, 3, new TieredQuantityDiscount());
-    PizzaOrder order2 = new PizzaOrder("Олена", "Маргарита", 120.00, 1, new NoDiscount());
-    PizzaOrder order3 = new PizzaOrder("Петро", "Чотири сири", 262.50, 6, new TieredQuantityDiscount());
-    PizzaOrder[] orders = { order1, order2, order3 };
+    private static void level1and2() throws InvalidQuantityException {
+        // ---------- Рівень 1: масив типу інтерфейсу + поліморфний виклик ----------
+        System.out.println("\n--- Рівень 1: оплата різними способами (PaymentMethod[]) ---");
+        PaymentMethod[] payments = {
+                new CardPayment("4521"),
+                new CashPayment(),
+                new WalletPayment(50.0)
+        };
+        PizzaOrder demo = new PizzaOrder("Іван", "Пепероні", 231.25, 30, 3, new TieredQuantityDiscount());
+        for (PaymentMethod method : payments) {
+            double paid = demo.checkout(method); // default-метод + pay() у кожного свій
+            System.out.printf("   покрито цим способом: %.2f з %.2f грн%n%n", paid, demo.getTotal());
+        }
 
-    for (PizzaOrder o : orders) {
-        IO.println(o.toReceiptLine());
+        // ---------- Рівень 2: два інтерфейси в одному класі ----------
+        System.out.println("--- Рівень 2: Receiptable (бізнес-поведінка) ---");
+        PizzaOrder[] orders = {
+                demo,
+                new PizzaOrder("Олена", "Маргарита", 120.00, 25, 1, new NoDiscount()),
+                new PizzaOrder("Петро", "Чотири сири", 262.50, 40, 6, new TieredQuantityDiscount())
+        };
+        for (PizzaOrder o : orders) {
+            System.out.println(o.toReceiptLine());
+        }
+
+        System.out.println("\n--- Рівень 2: Comparable (сортування за сумою) ---");
+        Arrays.sort(orders);
+        for (PizzaOrder o : orders) {
+            System.out.println(o.toReceiptLine());
+        }
     }
 
-    IO.println();
-    IO.println("--- Ті самі замовлення: Comparable (поведінка сортування) ---");
-    Arrays.sort(orders); // використовує compareTo(...) з PizzaOrder
-    for (PizzaOrder o : orders) {
-        IO.println(o.toReceiptLine());
+    private static void level3() throws InvalidQuantityException {
+        // ---------- Рівень 3: Strategy, зміна поведінки під час виконання ----------
+        System.out.println("\n--- Рівень 3: Strategy — зміна стратегії на ТОМУ САМОМУ об'єкті ---");
+        PizzaOrder order = new PizzaOrder("Марія", "Гавайська", 218.75, 35, 2, new TieredQuantityDiscount());
+        System.out.println("Початкова (через конструктор): " + order.toReceiptLine());
+
+        DiscountStrategy[] strategies = {
+                new PromoCodeDiscount(20),
+                new NoDiscount(),
+                new TieredQuantityDiscount()
+        };
+        for (DiscountStrategy s : strategies) {
+            order.setDiscountStrategy(s); // runtime-заміна, новий PizzaOrder не створюється
+            System.out.println("setDiscountStrategy(" + s.getClass().getSimpleName() + "): "
+                    + order.toReceiptLine());
+        }
     }
-
-    // ---------------- Рівень 3: Strategy — зміна поведінки під час виконання ----------------
-    IO.println();
-    IO.println("--- Strategy: зміна стратегії знижки БЕЗ створення нового об'єкта ---");
-    PizzaOrder promoOrder = new PizzaOrder("Марія", "Гавайська", 218.75, 2, new TieredQuantityDiscount());
-    IO.println("До зміни стратегії:                              " + promoOrder.toReceiptLine());
-
-    promoOrder.setDiscountStrategy(new PromoCodeDiscount(20));
-    IO.println("Після setDiscountStrategy(PromoCodeDiscount 20%): " + promoOrder.toReceiptLine());
-
-    promoOrder.setDiscountStrategy(new NoDiscount());
-    IO.println("Після setDiscountStrategy(NoDiscount):            " + promoOrder.toReceiptLine());
 }
