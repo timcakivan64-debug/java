@@ -59,7 +59,7 @@ public class PizzaOrder implements Comparable<PizzaOrder>, Receiptable {
     }
 
     /** Strategy: стратегію можна ЗМІНИТИ під час виконання, без створення нового об'єкта. */
-    public void setDiscountStrategy(DiscountStrategy discountStrategy) {
+    public final void setDiscountStrategy(DiscountStrategy discountStrategy) {
         if (discountStrategy == null) {
             throw new IllegalArgumentException("Стратегія знижки не може бути null");
         }

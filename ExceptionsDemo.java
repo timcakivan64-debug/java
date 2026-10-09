@@ -40,16 +40,15 @@ public class ExceptionsDemo {
         }
 
         // Ситуація 3: некоректне введення з Scanner (замість числа — текст)
-        Scanner scanner = new Scanner("три");   // імітація введення користувача
-        try {
+        // try-with-resources: Scanner закривається автоматично, а finally лишається для підсумкової дії
+        try (Scanner scanner = new Scanner("три")) {   // імітація введення користувача
             System.out.print("Введіть кількість піц (число): ");
             int qty = scanner.nextInt();
             System.out.println("Прочитано: " + qty);
         } catch (InputMismatchException e) {
             System.out.println("\nПомилка: кількість треба вводити цифрами, а не словами.");
         } finally {
-            scanner.close(); // гарантоване звільнення ресурсу
-            System.out.println("[finally] Scanner закрито.");
+            System.out.println("[finally] Обробку введення завершено (Scanner закрито автоматично).");
         }
     }
 
@@ -64,8 +63,8 @@ public class ExceptionsDemo {
     private static void level2() {
         System.out.println("\n===== ЛР3, рівень 2: власний checked-виняток =====");
         try {
-            new PizzaOrder("Іван", "Пепероні", 231.25, 30, 70, new NoDiscount());
-            System.out.println("Замовлення створено.");
+            PizzaOrder order = new PizzaOrder("Іван", "Пепероні", 231.25, 30, 70, new NoDiscount());
+            System.out.println("Замовлення створено: " + order.toReceiptLine());
         } catch (InvalidQuantityException e) {
             System.out.println("Порушено доменне правило: " + e.getMessage());
             System.out.println("Некоректне значення, що спричинило виняток: " + e.getInvalidQuantity());
