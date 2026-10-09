@@ -1,44 +1,43 @@
-# ЛР4. Інтерфейси, абстрактні класи, Strategy
+# ЛР3. Обробка винятків та власні підкласи Exception
 
-Консольний застосунок мовою Java — продовження предметної області
-«Електронне меню піцерії» (ЛР №1–3). Реалізовано поліморфну поведінку
-через інтерфейси, абстрактний клас зі спільною логікою та паттерн Strategy.
+Консольний застосунок мовою Java — продовження предметної області ЛР №1
+(«Електронне меню піцерії»). До логіки оформлення замовлення додано
+обробку виняткових ситуацій: try-catch-finally, власні checked- та
+unchecked-винятки, повторне збудження (re-throw) і невелику ієрархію
+власних класів винятків.
 
 ## Файли
 
 | Файл | Призначення |
 | --- | --- |
-| `Main.java` | демонстрація всіх трьох рівнів |
-| `PaymentMethod.java` | інтерфейс способу оплати (+ default-метод) |
-| `AbstractPaymentMethod.java` | абстрактний клас зі спільною валідацією суми |
-| `CardPayment.java`, `CashPayment.java` | реалізації через абстрактний клас |
-| `WalletPayment.java` | «чиста» реалізація інтерфейсу, перевизначає default-метод |
-| `DiscountStrategy.java` | інтерфейс-стратегія розрахунку знижки |
-| `TieredQuantityDiscount.java` | стратегія: знижка за кількістю (як у ЛР №1) |
-| `NoDiscount.java` | стратегія: без знижки |
-| `PromoCodeDiscount.java` | стратегія: фіксований % за промокодом |
-| `Receiptable.java` | інтерфейс бізнес-поведінки (рядок чека) |
-| `PizzaOrder.java` | контекст Strategy; реалізує `Comparable` + `Receiptable` одночасно |
+| `Main.java` | основна логіка меню піцерії + обробка винятків |
+| `PizzeriaException.java` | базовий **unchecked** виняток домену (`extends RuntimeException`) |
+| `InvalidDiameterException.java` | підклас `PizzeriaException` — некоректний діаметр піци |
+| `InvalidTipException.java` | підклас `PizzeriaException` — від'ємні чайові |
+| `InvalidQuantityException.java` | власний **checked** виняток (`extends Exception`) — некоректна кількість піц |
 
 ## Що саме реалізовано
 
 ### Рівень 1. Базовий
-- Поведінка, що відрізняється: **спосіб оплати замовлення**.
-- Інтерфейс `PaymentMethod` і три реалізації: `CardPayment`, `CashPayment`, `WalletPayment`.
-- Масив `PaymentMethod[]` + цикл `for` → поліморфний виклик `pay(...)`: кожен клас списує гроші по-своєму.
+- Дві ситуації з можливою помилкою виконання:
+  1. `InputMismatchException` — нечислове введення у `Scanner`;
+  2. `ArithmeticException` — ділення кількості піц на 0 осіб при розподілі рахунку.
+- У кожному `catch` — конкретний тип винятку (без узагальненого `catch (Exception e)`) і зрозуміле повідомлення користувачу.
+- Блок `finally` — гарантоване закриття `Scanner` та підсумкове повідомлення.
 
 ### Рівень 2. Середній
-- **Default-метод** `printPaymentHeader(...)` в `PaymentMethod` — `CardPayment`/`CashPayment` використовують його без змін, `WalletPayment` перевизначає (додає інформацію про бонуси).
-- **Абстрактний клас** `AbstractPaymentMethod` виносить спільну перевірку суми для `CardPayment`/`CashPayment`; `WalletPayment` свідомо реалізує інтерфейс напряму — показано обидва підходи й коментарем пояснено, чому саме так.
-- **Клас із двома інтерфейсами одночасно**: `PizzaOrder implements Comparable<PizzaOrder>, Receiptable` — окремо поведінка сортування (`compareTo`) і окремо бізнес-поведінка (`toReceiptLine`).
+- Власний **checked**-виняток `InvalidQuantityException` (`extends Exception`), конструктор `super(message)` + власне поле `invalidQuantity`.
+- Кидається явно (`throw new ...`) у методі `validateQuantity(...)`, коли кількість піц поза межами 1–50.
+- Перехоплюється окремим `catch (InvalidQuantityException e)`.
 
-### Рівень 3. Високий — паттерн Strategy
-- `DiscountStrategy` — інтерфейс-стратегія з трьома реалізаціями.
-- `PizzaOrder` (контекст) приймає стратегію через конструктор і дозволяє **змінити її під час виконання** методом `setDiscountStrategy(...)` — без створення нового об'єкта. У `Main.java` це показано на одному й тому ж об'єкті `promoOrder`: спочатку знижка за кількістю, потім промокод 20%, потім без знижки.
+### Рівень 3. Високий
+- Множинна обробка: 6 `catch`-блоків в одному `try`, від специфічних до загального (`PizzeriaException` — останній, бо є батьківським для двох підкласів).
+- Повторне збудження (re-throw): метод `readInt(...)` перехоплює `InputMismatchException`, логує подію (`[LOG] ...`) і кидає її далі (`throw e;`) — остаточно обробляється вже в `main()`.
+- Невелика ієрархія власних винятків: `PizzeriaException` (базовий, unchecked) → `InvalidDiameterException`, `InvalidTipException` (підкласи). Метод `demoBaseClassCatch()` демонструє, що `catch (PizzeriaException e)` перехоплює обидва підтипи.
 
 ## Вимоги
 
-JDK 25 або новіший (компактний файл-джерело `Main.java` з `void main()`).
+- JDK 25 або новіший (у проєкті використовується компактний файл-джерело з `void main()`).
 
 ## Компіляція та запуск
 
@@ -51,25 +50,36 @@ java Main
 
 ```bat
 chcp 65001
-java -Dstdout.encoding=UTF-8 Main
+java -Dstdout.encoding=UTF-8 -Dstdin.encoding=UTF-8 Main
 ```
 
-## Приклад виводу (фрагмент Strategy-демонстрації)
+## Приклад успішного запуску
+
+Ввід: `Іван`, піца `2`, діаметр `35`, кількість `3`, сир `так`, чайові `20.50`, осіб `2`
 
 ```
-До зміни стратегії:                              Марія | Гавайська x2 | знижка за кількістю ... | ДО СПЛАТИ:  437.50 грн
-Після setDiscountStrategy(PromoCodeDiscount 20%): Марія | Гавайська x2 | промокод на 20.0% знижки | ДО СПЛАТИ:  350.00 грн
-Після setDiscountStrategy(NoDiscount):            Марія | Гавайська x2 | без знижки               | ДО СПЛАТИ:  437.50 грн
+ДО СПЛАТИ:         739.38 грн
+На кожну з 2 осіб припадає приблизно 1 піц(и).
 ```
 
-Той самий об'єкт `promoOrder`, три різні результати — завдяки Strategy.
+## Приклади обробки помилок
+
+| Що вводить користувач | Який виняток спрацьовує | Повідомлення |
+| --- | --- | --- |
+| `абв` замість номера піци | `InputMismatchException` (re-throw з `readInt`) | «ви ввели текст там, де очікувалося число» |
+| діаметр `33` | `InvalidDiameterException` | «Непідтримуваний діаметр 33 см...» |
+| кількість `0` | `InvalidQuantityException` (checked) | «Кількість піц має бути від 1 до 50...» |
+| чайові `-10` | `InvalidTipException` | «Чайові не можуть бути від'ємними...» |
+| осіб `0` | `ArithmeticException` | «неможливо розділити замовлення на 0 осіб» |
+
+Усі п'ять сценаріїв протестовано вручну — кожен виводить коректне повідомлення, після чого незалежно від результату виконується блок `finally`.
 
 ## Git-flow
 
 ```bash
-git checkout -b lr4/pizzeria-interfaces
-git add *.java README.md
-git commit -m "LR4: interfaces, abstract class, Strategy pattern for pizzeria"
-git push -u origin lr4/pizzeria-interfaces
+git checkout -b lr3/pizzeria-exceptions
+git add Main.java PizzeriaException.java InvalidDiameterException.java InvalidTipException.java InvalidQuantityException.java README.md
+git commit -m "LR3: exception handling for pizzeria menu"
+git push -u origin lr3/pizzeria-exceptions
 # після цього створити Pull Request у main
 ```
