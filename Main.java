@@ -55,17 +55,16 @@ void main() {
     IO.print("Ваше ім'я: ");
     String customerName = scanner.nextLine();
 
-    // ---------- ЛР4, рівень 1: масив об'єктів інтерфейсу + поліморфізм ----------
+    // ---------- ЛР5, рівень 1 (Factory Method): жодного new тут більше немає ----------
+    // Раніше (ЛР4) тут стояв масив PaymentMethod[] з трьома "new ...()" напряму.
+    // Тепер меню лише ПОКАЗУЄ підписи, а створення об'єкта — відповідальність
+    // PaymentMethodFactory (дивись цей клас і коментар у ньому).
     IO.println();
-    IO.println("--- Доступні способи оплати (PaymentMethod) ---");
-    PaymentMethod[] availablePayments = {
-            new CardPayment("4521"),
-            new CashPayment(),
-            new WalletPayment(50.0)
-    };
-    for (int i = 0; i < availablePayments.length; i++) {
-        IO.println((i + 1) + ") " + availablePayments[i].getLabel());
-    }
+    IO.println("--- Доступні способи оплати ---");
+    IO.println("1) банківська картка");
+    IO.println("2) готівка");
+    IO.println("3) бонусний гаманець");
+    IO.println("4) стороння банківська система (демонстрація Adapter)");
 
     // ---------- ЛР3: один try з кількома catch — реальна обробка вводу ----------
     try {
@@ -115,6 +114,11 @@ void main() {
         // ---------- ЛР4, рівень 3: Strategy — PizzaOrder як контекст ----------
         PizzaOrder order = new PizzaOrder(customerName, pizzaName, unitPrice, quantity,
                 new TieredQuantityDiscount());
+
+        // ---------- ЛР5, рівень 2 (Observer): підписуємо два незалежних спостерігачі ----------
+        order.addObserver(new ReceiptPrinterObserver());
+        order.addObserver(new AuditLogObserver());
+
         IO.println();
         IO.println("Проміжний чек (стандартна знижка за кількістю):");
         IO.println(order.toReceiptLine());
@@ -124,9 +128,10 @@ void main() {
         if (hasPromo.equalsIgnoreCase("так")) {
             IO.print("Відсоток знижки за промокодом: ");
             double promoPercent = scanner.nextDouble();
-            order.setDiscountStrategy(new PromoCodeDiscount(promoPercent)); // заміна стратегії "на льоту"
-            IO.println("Чек після застосування промокоду:");
-            IO.println(order.toReceiptLine());
+            // Заміна стратегії "на льоту" (Strategy, ЛР4) — ТЕПЕР цей виклик ще й
+            // автоматично розсилає подію обом спостерігачам (Observer, ЛР5):
+            // ReceiptPrinterObserver одразу надрукує новий чек, AuditLogObserver — запише подію в лог.
+            order.setDiscountStrategy(new PromoCodeDiscount(promoPercent));
         }
 
         IO.print("Чайові, грн (наприклад, 20.50): ");
@@ -148,15 +153,14 @@ void main() {
         System.out.printf("ДО СПЛАТИ З ЧАЙОВИМИ:   %.2f грн%n", totalWithTip);
         System.out.printf("На кожну з %d осіб припадає приблизно %d піц(и).%n", people, pizzasPerPerson);
 
-        // ---------- Оплата РЕАЛЬНОГО замовлення обраним способом ----------
-        int paymentChoice = readInt(scanner, "Яким способом оплачуєте? (1-картка, 2-готівка, 3-гаманець): ");
-        PaymentMethod chosenPayment;
-        if (paymentChoice == 2) chosenPayment = availablePayments[1];
-        else if (paymentChoice == 3) chosenPayment = availablePayments[2];
-        else chosenPayment = availablePayments[0];
+        // ---------- ЛР5: Factory (створення) + Observer (сповіщення після оплати) ----------
+        int paymentChoice = readInt(scanner,
+                "Яким способом оплачуєте? (1-картка, 2-готівка, 3-гаманець, 4-стороння система): ");
+        PaymentMethod chosenPayment = PaymentMethodFactory.create(paymentChoice); // Factory Method
 
-        chosenPayment.printPaymentHeader(customerName); // default-метод (у Wallet — перевизначений)
-        chosenPayment.pay(totalWithTip);                // своя реалізація в кожному класі
+        // applyPayment(...) сам друкує заголовок, викликає pay(...) і розсилає подію "ОПЛАЧЕНО"
+        // обом спостерігачам — Main більше не керує цим напряму (раніше викликав pay() сам).
+        order.applyPayment(chosenPayment, tip);
 
         IO.println("==============================================");
         IO.println("Дякуємо за замовлення, " + customerName + "! Смачного!");
