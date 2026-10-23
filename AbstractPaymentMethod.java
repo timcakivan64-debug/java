@@ -15,3 +15,4 @@ public abstract class AbstractPaymentMethod implements PaymentMethod {
         }
         return amount;
     }
+}
