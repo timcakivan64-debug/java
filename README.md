@@ -1,92 +1,160 @@
-# ЛР1. Електронне меню піцерії
+# ЛР6. Ієрархія класів на основі наслідування (піцерія)
 
-Консольний застосунок мовою Java, який показує меню піцерії, приймає замовлення
-від користувача, розраховує вартість зі знижкою та друкує чек.
+Це **рефакторинг** коду ЛР1–5, а не новий проєкт. Проблемне місце, знайдене в
+проєкті: вид піци був лише рядком `pizzaName` + числом `unitPrice`, а тип
+визначався ланцюжком `if / else if` за номером меню в `Main` (так само розмір
+→ коефіцієнт ціни). Тепер кожен вид піци — окремий клас ієрархії `Pizza`.
 
-## Предметна область
+## Діаграма класів
 
-Піцерія: клієнт обирає піцу з меню й оформлює замовлення.
+```mermaid
+classDiagram
+    class Pizza {
+        <<abstract, sealed>>
+        -String name
+        -double basePrice
+        -int diameter
+        -boolean extraCheese
+        +getIngredients()* String
+        +getBakingMinutes() int
+        +getSizeCoefficient() double  «final»
+        +getPrice() double  «final»
+        +toString() String
+        +equals(Object) boolean
+    }
+    class MargheritaPizza { <<final>> }
+    class FourCheesePizza { <<final>> }
+    class HawaiianPizza { <<final>> }
+    class MeatPizza {
+        <<sealed>>
+        -int meatGrams
+    }
+    class PepperoniPizza {
+        <<final>>
+        -boolean spicy
+        +isSpicy() boolean
+    }
+    class PizzaOrder
+    class PizzaCombo
+    Pizza <|-- MargheritaPizza
+    Pizza <|-- FourCheesePizza
+    Pizza <|-- HawaiianPizza
+    Pizza <|-- MeatPizza
+    MeatPizza <|-- PepperoniPizza
+    PizzaOrder o-- Pizza : має
+    PizzaCombo o-- "1..*" Pizza : має
+```
 
-### Сутності та характеристики
+## Рівень 1. Базовий
 
-| Сутність | Характеристика | Тип | Звідки береться |
-| --- | --- | --- | --- |
-| Піца | Назва | `String` | за номером з меню |
-| Піца | Ціна за розмір 30 см | `double` | за номером з меню |
-| Піца | Діаметр, см | `int` | вводить користувач |
-| Замовлення | Ім'я клієнта | `String` | вводить користувач |
-| Замовлення | Кількість піц | `int` | вводить користувач |
-| Замовлення | Додатковий сир | `String` (так/ні) | вводить користувач |
-| Замовлення | Чайові, грн | `double` | вводить користувач |
+**Перевірка «is-a»:** «Маргарита є різновидом піци» ✔, «Пепероні є різновидом
+м'ясної піци» ✔. Навпаки («піца має маргариту») — безглуздо.
 
-## Обчислення
+* `Pizza` містить спільні поля (`name`, `basePrice`, `diameter`, `extraCheese`),
+  конструктор, валідацію діаметра, розрахунок ціни. Усі поля — `private`,
+  підкласи користуються гетерами (`protected` не знадобився).
+* У підкласах — лише специфічне: `meatGrams` (`MeatPizza`), `spicy` (`PepperoniPizza`).
+* Конструктори підкласів викликають `super(...)`.
+* `@Override`: `getIngredients()` у кожному підкласі, `getBakingMinutes()`, `toString()`.
+  `MeatPizza.toString()` і `PepperoniPizza.toString()` будують рядок із `super.toString()`.
+* Поліморфізм: `InheritanceDemo.demoPolymorphism()` — `List<Pizza>` з різними
+  підкласами, у циклі викликаються перевизначені методи. Також `PizzaFactory.menu()`
+  будує меню в `Main` поліморфно.
 
-1. Ціна однієї піци = ціна зі меню × коефіцієнт розміру
-   (25 см — 0.80, 30 см — 1.00, 35 см — 1.25, 40 см — 1.50).
-2. Якщо обрано додатковий сир — до ціни однієї піци додається 35.00 грн.
-3. Сума = ціна однієї піци × кількість.
-4. Знижка: від 3 піц — 10%, від 5 піц — 15%.
-5. **До сплати = сума − знижка + чайові.**
+## Рівень 2. Середній
 
-Усі грошові значення виводяться через `printf` з двома знаками після коми.
+* **Абстрактний клас.** `Pizza` абстрактна: «просто піца» без назви й складу в
+  піцерії не існує. Абстрактний метод `getIngredients()`: склад унікальний для
+  кожного виду, змістовної реалізації за замовчуванням немає; звичайний метод
+  повернув би вигадане значення, і підклас міг би забути його перевизначити,
+  а абстрактний змушує компілятор це вимагати.
+* **Три рівні:** `Pizza → MeatPizza → PepperoniPizza`. Ланцюжок конструкторів
+  (виводиться в `InheritanceDemo`, коли `Pizza.setTraceConstructors(true)`):
+  ```
+  [Pizza] конструктор базового класу: Пепероні
+  [MeatPizza] конструктор другого рівня, м'яса: 100 г
+  [PepperoniPizza] конструктор третього рівня, гостра: false
+  ```
+  Порядок: конструктор підкласу першим ділом викликає `super(...)`, тому спершу
+  повністю виконується конструктор предка (ініціалізуються його поля), і лише
+  потім — тіло конструктора нащадка.
+* **`this(...)`:** `Pizza(name, price)` → `Pizza(name, price, diameter)` →
+  головний конструктор; у підкласах `new MargheritaPizza()` делегує до
+  `MargheritaPizza(int, boolean)`. Уся ініціалізація — в одному місці.
+* **`final`:** методи `getSizeCoefficient()` і `getPrice()` — `final`, бо
+  коефіцієнт за діаметр (25 см −20 %, 35 см +25 %, 40 см +50 %) — бізнес-правило
+  піцерії, підклас не повинен його змінювати, інакше чеки за однаковий розмір
+  різнилися б. Листові класи також `final`.
+* **`instanceof` з pattern matching:** `if (p instanceof PepperoniPizza pepperoni)
+  { pepperoni.isSpicy(); }`.
+  **Статичний тип** — тип у декларації змінної (`Pizza p`), за ним компілятор
+  вирішує, які методи можна викликати (`p.isSpicy()` не скомпілюється).
+  **Динамічний тип** — фактичний клас об'єкта (`PepperoniPizza`), за ним під час
+  виконання вибирається версія перевизначеного методу.
 
-## Особливості реалізації
+## Рівень 3. Високий
 
-- Масиви не використовуються.
-- Явні оголошення класів не використовуються: програма написана як
-  *compact source file* (Java 25) — достатньо методу `void main()`.
-- Розгалуження реалізовано конструкціями `if … else if … else`.
-- Введення — `Scanner`; ім'я читається першим через `nextLine()`, щоб уникнути
-  проблеми послідовного виклику `nextInt()` і `nextLine()`.
-- На початку програми встановлено `Locale.US`, тому дробові числа вводяться
-  через **крапку** (`20.50`).
+* **`equals()`/`hashCode()`:** перевизначені в `Pizza`, `MeatPizza` (нове поле
+  `meatGrams`) і `PepperoniPizza` (нове поле `spicy`). Обрано перевірку через
+  **`getClass()`**: об'єкти рівні, лише якщо мають точно той самий клас.
+  Результат у демо: `meat.equals(pepperoni) == false` і `pepperoni.equals(meat)
+  == false` — симетрія збережена. З `instanceof` (клас `BadBase/BadSub` у
+  `InheritanceDemo`) вийшло `base.equals(sub) == true`, але
+  `sub.equals(base) == false` — симетрію порушено. Спроба «виправити» це
+  порівнянням без нових полів порушила б транзитивність. Мінус `getClass()` —
+  підклас не підставляється замість предка в `equals` (формально обмежує принцип
+  Лісков), але для класів, що додають стан, це безпечніше. Оскільки всі класи
+  ієрархії `final`/`sealed`, анонімних підкласів, які зламали б порівняння, немає.
+* **Композиція замість наслідування:** `PizzaCombo` (кілька піц + напій).
+  Спокуса — `PizzaCombo extends Pizza`, але «комбо є піцею» — хибно: комбо
+  *має* піци. При наслідуванні зламалось би: у комбо немає єдиного `diameter` і
+  `getIngredients()`; успадковані `getSizeCoefficient()`/`getPrice()` (`final`)
+  рахують ціну однієї піци й дають хибний результат; комбо довелося б
+  дописувати у `permits` і в кожен `switch` по `Pizza`; будь-який код, що очікує
+  `Pizza`, вважав би, що це одна піца. Тому `PizzaCombo` тримає `List<Pizza>`.
+  Так само `PizzaOrder` *має* `Pizza` (поле), а не успадковує її.
+* **Діаграма** — вище.
+* **Sealed (самостійно):** `Pizza` — `sealed ... permits MargheritaPizza,
+  FourCheesePizza, HawaiianPizza, MeatPizza`; `MeatPizza` — `sealed ... permits
+  PepperoniPizza`; решта — `final`. У `InheritanceDemo.category(Pizza)`
+  ланцюжок `if (x instanceof ...)` замінено на `switch` із pattern matching без
+  `default`. **Гарантія для компілятора:** множина підтипів закрита й відома, тому
+  `switch` перевіряється на вичерпність: додаєш новий вид піци в `permits` —
+  усі `switch` без `default` перестають компілюватися, доки не обробиш новий
+  випадок. Порядок `case` має значення: `PepperoniPizza` перед `MeatPizza`
+  (інакше помилка dominance).
 
-## Вимоги
+## Що змінено порівняно з ЛР5
 
-- JDK 25 або новіший (`javac -version`).
+| Файл | Зміна |
+| --- | --- |
+| `Pizza`, `MargheritaPizza`, `FourCheesePizza`, `HawaiianPizza`, `MeatPizza`, `PepperoniPizza` | **нові** — ієрархія |
+| `PizzaFactory`, `InvalidMenuItemException` | **нові** — замінюють `if/else` за номером меню |
+| `PizzaCombo`, `InheritanceDemo` | **нові** — композиція та демонстрації |
+| `PizzaOrder` | замість `String pizzaName` + `double unitPrice` тримає `Pizza` |
+| `Main` | меню, вибір піци, розмір, ціна — через `PizzaFactory`/`Pizza`; виклик `InheritanceDemo.run()` |
+| решта (винятки, Strategy, Observer, платежі, Adapter) | без змін |
+
+Поведінка програми збережена: ті самі ціни й чеки (напр., пепероні 35 см ×3 з
+сиром і знижкою за кількістю = 718.88 грн). Єдина відмінність: невірний номер
+меню тепер кидає `InvalidMenuItemException` (повідомлення те саме), тому
+демонстраційні блоки після `try` теж виконуються.
 
 ## Компіляція та запуск
 
+Потрібна JDK 25 (використовується `IO.println` та unnamed-клас `Main`).
+
 ```bash
-javac Main.java
+javac *.java
 java Main
-```
-
-Якщо в консолі Windows некоректно відображається кирилиця:
-
-```bat
-chcp 65001
-java -Dstdout.encoding=UTF-8 -Dstdin.encoding=UTF-8 Main
-```
-
-## Приклад роботи
-
-Ввід: `Іван`, піца `2`, розмір `35`, кількість `3`, сир `так`, чайові `20.50`
-
-```
-==============================================
-                   ВАШ ЧЕК
-==============================================
-Клієнт:            Іван
-Піца:              Пепероні, 35 см
-Додатковий сир:    так
-Ціна за 1 шт.:     266.25 грн
-Кількість:         3
-Сума:              798.75 грн
-Знижка (10%):      -79.88 грн
-Чайові:            20.50 грн
-----------------------------------------------
-ДО СПЛАТИ:         739.38 грн
-==============================================
-Дякуємо за замовлення, Іван! Смачного!
 ```
 
 ## Git-flow
 
 ```bash
-git checkout -b lr1/pizzeria-menu
-git add Main.java README.md
-git commit -m "LR1: pizzeria electronic menu"
-git push -u origin lr1/pizzeria-menu
+git checkout -b lr6/pizza-inheritance
+git add *.java README.md
+git commit -m "LR6: pizza class hierarchy (inheritance, abstract, sealed, composition)"
+git push -u origin lr6/pizza-inheritance
 # після цього створити Pull Request у main
 ```
